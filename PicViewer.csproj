@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <MainVersion>1.0</MainVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Svg" Version="3.4.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Languages\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="SetAutoVersion" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <BuildShortDate>$([System.DateTime]::Now.ToString("yyMMdd"))</BuildShortDate>
+      <Version>$(MainVersion).$([System.DateTime]::Now.ToString("yy.MMdd"))</Version>
+      <InformationalVersion>$(MainVersion) (Build $(BuildShortDate))</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+</Project>

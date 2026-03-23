@@ -21,6 +21,13 @@ namespace PicViewer
         
         public static string LanguageFile = "en_US.ini";
 
+        // Window state settings
+        public static double WindowLeft = double.NaN;
+        public static double WindowTop = double.NaN;
+        public static double WindowWidth = 1100;
+        public static double WindowHeight = 700;
+        public static System.Windows.WindowState WindowState = System.Windows.WindowState.Normal;
+
         private static readonly string SettingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.ini");
 
         public static void Load()
@@ -49,6 +56,11 @@ namespace PicViewer
                         else if (key == "ShowIco") ShowIco = bool.Parse(value);
                         else if (key == "ShowSvg") ShowSvg = bool.Parse(value);
                         else if (key == "LanguageFile") LanguageFile = value;
+                        else if (key == "WindowLeft") WindowLeft = double.Parse(value);
+                        else if (key == "WindowTop") WindowTop = double.Parse(value);
+                        else if (key == "WindowWidth") WindowWidth = double.Parse(value);
+                        else if (key == "WindowHeight") WindowHeight = double.Parse(value);
+                        else if (key == "WindowState") WindowState = Enum.Parse<System.Windows.WindowState>(value);
                     }
                 }
             }
@@ -70,6 +82,12 @@ namespace PicViewer
                     sw.WriteLine($"ShowTiff={ShowTiff}");
                     sw.WriteLine($"ShowIco={ShowIco}");
                     sw.WriteLine($"ShowSvg={ShowSvg}");
+                    
+                    sw.WriteLine($"WindowLeft={WindowLeft}");
+                    sw.WriteLine($"WindowTop={WindowTop}");
+                    sw.WriteLine($"WindowWidth={WindowWidth}");
+                    sw.WriteLine($"WindowHeight={WindowHeight}");
+                    sw.WriteLine($"WindowState={WindowState}");
                 }
             }
             catch { }

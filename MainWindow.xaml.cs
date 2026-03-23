@@ -30,6 +30,14 @@ namespace PicViewer
         public MainWindow()
         {
             InitializeComponent();
+            
+            // Restore Window State
+            if (!double.IsNaN(AppSettings.WindowLeft)) this.Left = AppSettings.WindowLeft;
+            if (!double.IsNaN(AppSettings.WindowTop)) this.Top = AppSettings.WindowTop;
+            this.Width = AppSettings.WindowWidth;
+            this.Height = AppSettings.WindowHeight;
+            this.WindowState = AppSettings.WindowState;
+
             ImageItems = new ObservableCollection<ImageItem>();
             ThumbnailListView.ItemsSource = ImageItems; // Set data source
 
@@ -601,6 +609,33 @@ namespace PicViewer
             AboutWindow aboutWindow = new AboutWindow();
             aboutWindow.Owner = this;
             aboutWindow.ShowDialog();
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (_isFullScreen)
+            {
+                ToggleFullScreen(); // Restore normal state to get correct bounds
+            }
+            
+            AppSettings.WindowState = this.WindowState;
+            if (this.WindowState == WindowState.Normal)
+            {
+                AppSettings.WindowLeft = this.Left;
+                AppSettings.WindowTop = this.Top;
+                AppSettings.WindowWidth = this.Width;
+                AppSettings.WindowHeight = this.Height;
+            }
+            else
+            {
+                AppSettings.WindowLeft = this.RestoreBounds.Left;
+                AppSettings.WindowTop = this.RestoreBounds.Top;
+                AppSettings.WindowWidth = this.RestoreBounds.Width;
+                AppSettings.WindowHeight = this.RestoreBounds.Height;
+            }
+            
+            AppSettings.Save();
+            base.OnClosing(e);
         }
     }
 

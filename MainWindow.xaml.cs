@@ -29,16 +29,32 @@ namespace PicViewer
         
         private TreeViewItem? _pcNode;
 
+        private bool _openedFromExplorer = false;
+        private string? _startupImagePath = null;
+
         public MainWindow()
         {
             InitializeComponent();
             
-            // Restore Window State
-            if (!double.IsNaN(AppSettings.WindowLeft)) this.Left = AppSettings.WindowLeft;
-            if (!double.IsNaN(AppSettings.WindowTop)) this.Top = AppSettings.WindowTop;
-            this.Width = AppSettings.WindowWidth;
-            this.Height = AppSettings.WindowHeight;
-            this.WindowState = AppSettings.WindowState;
+            // Check if opened from Explorer BEFORE window draws
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Length > 1 && File.Exists(args[1]))
+            {
+                _openedFromExplorer = true; // Flag for Explorer startup behavior
+                _startupImagePath = args[1];
+                
+                // Toggle full screen immediately so the UI is laid out without borders/panels
+                ToggleFullScreen();
+            }
+            else
+            {
+                // Restore Window State only if not opening an image directly
+                if (!double.IsNaN(AppSettings.WindowLeft)) this.Left = AppSettings.WindowLeft;
+                if (!double.IsNaN(AppSettings.WindowTop)) this.Top = AppSettings.WindowTop;
+                this.Width = AppSettings.WindowWidth;
+                this.Height = AppSettings.WindowHeight;
+                this.WindowState = AppSettings.WindowState;
+            }
 
             ImageItems = new ObservableCollection<ImageItem>();
             ThumbnailListView.ItemsSource = ImageItems; // Set data source
@@ -61,6 +77,28 @@ namespace PicViewer
         {
             LoadLanguages();
             LoadDrives(); // Scan system drives after window load
+
+            if (_openedFromExplorer && !string.IsNullOrEmpty(_startupImagePath))
+            {
+                string dir = Path.GetDirectoryName(_startupImagePath) ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    LoadImagesFromFolder(dir);
+
+                    // Find the specific image in ImageItems and select it
+                    var targetItem = ImageItems.FirstOrDefault(i => i.ImagePath.Equals(_startupImagePath, StringComparison.OrdinalIgnoreCase));
+                    if (targetItem != null)
+                    {
+                        ThumbnailListView.SelectedItem = targetItem;
+                        ThumbnailListView.ScrollIntoView(targetItem);
+                    }
+                    else if (ImageItems.Count > 0)
+                    {
+                        ThumbnailListView.SelectedIndex = 0;
+                    }
+                }
+            }
         }
 
         private void LoadLanguages()
@@ -98,7 +136,14 @@ namespace PicViewer
             // Exit full screen mode when Escape key is pressed
             if (e.Key == System.Windows.Input.Key.Escape && _isFullScreen)
             {
-                ToggleFullScreen();
+                if (_openedFromExplorer)
+                {
+                    Application.Current.Shutdown();
+                }
+                else
+                {
+                    ToggleFullScreen();
+                }
                 e.Handled = true;
             }
         }
@@ -567,7 +612,15 @@ namespace PicViewer
         {
             if (e.ClickCount == 2)
             {
-                ToggleFullScreen();
+                if (_openedFromExplorer && _isFullScreen)
+                {
+                    _openedFromExplorer = false; // Transition to normal mode, Esc won't close app anymore
+                    ToggleFullScreen();
+                }
+                else
+                {
+                    ToggleFullScreen();
+                }
                 e.Handled = true;
             }
         }

@@ -26,6 +26,8 @@ namespace PicViewer
         // Save constraints before switching to full screen
         private GridLength _savedLeftColWidth;
         private GridLength _savedBottomRowHeight;
+        
+        private TreeViewItem? _pcNode;
 
         public MainWindow()
         {
@@ -137,9 +139,29 @@ namespace PicViewer
             FolderTreeView.Items.Add(quickAccessNode);
 
             // 2. Create 'Local Disk' root node
-            TreeViewItem pcNode = new TreeViewItem();
-            pcNode.Header = "🖥️ " + (string)Application.Current.Resources["Tree_LocalDisk"];
-            pcNode.IsExpanded = true;
+            _pcNode = new TreeViewItem();
+            _pcNode.Header = "🖥️ " + (string)Application.Current.Resources["Tree_LocalDisk"];
+            _pcNode.IsExpanded = true;
+            FolderTreeView.Items.Add(_pcNode);
+
+            RefreshDrives();
+        }
+
+        private void RefreshDrives()
+        {
+            if (_pcNode == null) return;
+
+            // Remember previously expanded drives if possible
+            var expandedDrives = new System.Collections.Generic.HashSet<string>();
+            foreach (TreeViewItem item in _pcNode.Items)
+            {
+                if (item.IsExpanded && item.Tag is string path)
+                {
+                    expandedDrives.Add(path);
+                }
+            }
+
+            _pcNode.Items.Clear();
 
             foreach (var drive in DriveInfo.GetDrives())
             {
@@ -148,12 +170,21 @@ namespace PicViewer
                     TreeViewItem item = new TreeViewItem();
                     item.Header = $"💿 {drive.Name} ({drive.VolumeLabel})";
                     item.Tag = drive.RootDirectory.FullName;
-                    item.Items.Add(null); // Add an empty child node so the UI shows the '+' sign
+                    
+                    if (expandedDrives.Contains(drive.RootDirectory.FullName))
+                    {
+                        item.IsExpanded = true;
+                        item.Items.Add(null);
+                    }
+                    else
+                    {
+                        item.Items.Add(null); // Add an empty child node so the UI shows the '+' sign
+                    }
+                    
                     item.Expanded += Folder_Expanded; // Register expanded event
-                    pcNode.Items.Add(item);
+                    _pcNode.Items.Add(item);
                 }
             }
-            FolderTreeView.Items.Add(pcNode);
         }
 
         // Dynamically load the next level folders when the user clicks the '+' sign to expand (Lazy Loading)
@@ -203,9 +234,12 @@ namespace PicViewer
             }
         }
 
+        private string? _currentFolderPath;
+
         // Read all images in the folder into the thumbnail list
         private void LoadImagesFromFolder(string folderPath)
         {
+            _currentFolderPath = folderPath;
             ImageItems.Clear();
             try
             {
@@ -275,6 +309,19 @@ namespace PicViewer
             }
             catch (UnauthorizedAccessException) { }
             catch (Exception) { }
+
+            // Automatically select the first image if available
+            if (ImageItems.Count > 0)
+            {
+                ThumbnailListView.SelectedIndex = 0;
+            }
+            else
+            {
+                // Clear the main view if the folder is empty
+                MainImageView.Source = null;
+                MinimapImage.Source = null;
+                if (TxtFileInfo != null) TxtFileInfo.Text = "";
+            }
         }
 
         // When a thumbnail is selected from the bottom list, display it in the central large image area
@@ -293,10 +340,14 @@ namespace PicViewer
 
                     string ext = Path.GetExtension(selectedImage.ImagePath).ToLower();
                     System.Windows.Media.ImageSource? fullImage = null;
+                    string fileInfoText = selectedImage.FileName;
 
                     if (ext == ".svg")
                     {
                         var svgDoc = Svg.SvgDocument.Open(selectedImage.ImagePath);
+                        
+                        fileInfoText = $"{Math.Round((double)svgDoc.Width.Value)} x {Math.Round((double)svgDoc.Height.Value)}  |  {selectedImage.FileName}";
+                        
                         // If there is an original dimension, set magnification factor to output high-res bitmap for large screen viewing
                         if (svgDoc.Width.Value > 0 && svgDoc.Height.Value > 0)
                         {
@@ -332,10 +383,13 @@ namespace PicViewer
                         bi.CacheOption = BitmapCacheOption.OnLoad; // Ensure image is fully loaded into memory without locking the file
                         bi.EndInit();
                         fullImage = bi;
+                        
+                        fileInfoText = $"{bi.PixelWidth} x {bi.PixelHeight}  |  {selectedImage.FileName}";
                     }
 
                     MainImageView.Source = fullImage;
                     MinimapImage.Source = fullImage; // Synchronously update the minimap thumbnail
+                    if (TxtFileInfo != null) TxtFileInfo.Text = fileInfoText;
                 }
                 catch (Exception ex)
                 {
@@ -636,6 +690,70 @@ namespace PicViewer
             
             AppSettings.Save();
             base.OnClosing(e);
+        }
+
+        // --- USB Hot Plug Support ---
+        private const int WM_DEVICECHANGE = 0x0219;
+        private const int DBT_DEVICEARRIVAL = 0x8000;
+        private const int DBT_DEVICEREMOVECOMPLETE = 0x8004;
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            System.Windows.Interop.HwndSource? source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            source?.AddHook(WndProc);
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_DEVICECHANGE)
+            {
+                int eventType = wParam.ToInt32();
+                if (eventType == DBT_DEVICEARRIVAL || eventType == DBT_DEVICEREMOVECOMPLETE)
+                {
+                    // Use Dispatcher to ensure we refresh drives on the UI thread and avoid blocking the message pump
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        RefreshDrives();
+
+                        // If a drive is removed, check if the currently previewed folder is still available
+                        if (eventType == DBT_DEVICEREMOVECOMPLETE && !string.IsNullOrEmpty(_currentFolderPath))
+                        {
+                            if (!Directory.Exists(_currentFolderPath))
+                            {
+                                SelectDefaultFolder();
+                            }
+                        }
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                }
+            }
+            return IntPtr.Zero;
+        }
+
+        private void SelectDefaultFolder()
+        {
+            string defaultPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+            
+            // Try to find 'My Pictures' in Quick Access and select it
+            if (FolderTreeView.Items.Count > 0 && FolderTreeView.Items[0] is TreeViewItem quickAccessNode)
+            {
+                foreach (TreeViewItem item in quickAccessNode.Items)
+                {
+                    if (item != null && item.Tag is string path && path.Equals(defaultPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                        return;
+                    }
+                }
+            }
+
+            // Fallback clear if default folder cannot be selected for some reason
+            ImageItems.Clear();
+            MainImageView.Source = null;
+            MinimapImage.Source = null;
+            if (TxtFileInfo != null) TxtFileInfo.Text = "";
+            _currentFolderPath = null;
         }
     }
 

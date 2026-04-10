@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PicViewer"
         mc:Ignorable="d"
-        Title="PicViewer" Height="700" Width="1100" Loaded="Window_Loaded" PreviewKeyDown="Window_PreviewKeyDown">
+        Title="PicViewer" Height="700" Width="1100" Loaded="Window_Loaded" PreviewKeyDown="Window_PreviewKeyDown" Icon="/ICON.ico">
     <DockPanel>
         <!-- Top Menu Bar -->
         <Menu x:Name="TopMenuBar" DockPanel.Dock="Top" Background="#2D2D30" Foreground="#E0E0E0" Padding="2">

@@ -5,7 +5,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <MainVersion>1.0</MainVersion>
+    <MainVersion>1.1</MainVersion>
+    <ApplicationIcon>ICON.ico</ApplicationIcon>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +19,14 @@
     <None Include="Languages\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ICON.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="ICON.ico" />
   </ItemGroup>
 
   <Target Name="SetAutoVersion" BeforeTargets="PrepareForBuild">

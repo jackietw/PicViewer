@@ -4,6 +4,7 @@
  */
 
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 
@@ -18,6 +19,7 @@ namespace PicViewer
         public AboutWindow()
         {
             InitializeComponent();
+            AppNameTextBlock.Text += $" ({RuntimeInformation.ProcessArchitecture.ToString().ToLower()})";
             LoadVersionInfo();
         }
 
@@ -62,6 +64,12 @@ namespace PicViewer
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
         }
     }
 }

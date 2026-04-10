@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource Title_AboutWindow}" Height="250" Width="415" WindowStartupLocation="CenterOwner" ResizeMode="NoResize" Background="#1E1E1E">
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
-        <TextBlock Text="PicViewer" Foreground="#E0E0E0" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center"/>
+        <TextBlock x:Name="AppNameTextBlock" Text="PicViewer" Foreground="#E0E0E0" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" HorizontalAlignment="Center"/>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,25">
             <TextBlock x:Name="VersionText" Text="{DynamicResource About_Version}" Foreground="#E0E0E0" FontSize="14"/>
@@ -11,7 +11,16 @@
             <TextBlock x:Name="VersionTextBlock" Foreground="AntiqueWhite" FontSize="14" Cursor="Hand" MouseDown="VersionTextBlock_MouseDown" ToolTip="{DynamicResource ToolTip_DoubleClickHash}" Background="Transparent" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-            <TextBlock Text="Copyright © 2026 Jackie&#x0a;Licensed under GPLv3." Foreground="#E0E0E0" FontSize="14" TextAlignment="Center"/>
+            <TextBlock Foreground="#E0E0E0" FontSize="14" TextAlignment="Center">
+                <Run Text="Copyright © 2026 Jackie"/>
+                <LineBreak/>
+                <Run Text="Licensed under GPLv3."/>
+                <LineBreak/>
+                <Run Text="Official Website: "/>
+                <Hyperlink NavigateUri="https://github.com/jackietw/PicViewer" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#4DA6FF">
+                    https://github.com/jackietw/PicViewer
+                </Hyperlink>
+            </TextBlock>
         </StackPanel>
         <Button Content="{DynamicResource Btn_Ok}" Width="100" Height="30" Click="OkButton_Click" Background="#3E3E42" Foreground="#E0E0E0" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Center" />
     </StackPanel>

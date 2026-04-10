@@ -1,10 +1,11 @@
 # PicViewer
 
-[English](#english) | [正體中文](#正體中文)
+[English](#english) | [中文](#中文)
 
 ---
 
 <a name="english"></a>
+
 ## English
 
 **PicViewer** is a modern, lightweight, and feature-rich image viewer built with C# and WPF (.NET 10). It provides a clean, user-friendly interface with advanced features for browsing and viewing images locally.
@@ -21,7 +22,7 @@
 - **Minimap Preview**: A minimap appears during panning and zooming, showing the current viewport relative to the whole image.
 - **Tree View & Quick Access**: Easily navigate through your PC's local drives and quick access folders (Desktop, Downloads, Pictures, etc.).
 - **USB Hot-Plug Support**: Automatically detects and refreshes the tree view when USB drives are inserted or removed.
-- **Multi-Language Support**: Supports English, Traditional Chinese, and more via external `.ini` language files.
+- **Multi-Language Support**: Supports English, Chinese, and more via external `.ini` language files.
 - **Customizable Filters**: Filter which image formats are displayed in the current folder.
 - **State Memory**: Automatically remembers your window size, position, and panel layout configurations for your next session.
 
@@ -39,7 +40,8 @@
 ---
 
 <a name="正體中文"></a>
-## 正體中文
+
+## 中文
 
 **PicViewer** 是一款使用 C# 和 WPF (.NET 10) 開發的現代化、輕量級且功能豐富的圖片檢視器。它提供簡潔、用戶友好的介面，以及在本地瀏覽和檢視圖片的進階功能。
 
@@ -55,7 +57,7 @@
 - **迷你地圖 (Minimap)**：在平移或縮放時會顯示迷你預覽圖，標示當前在整張圖片中的可視範圍。
 - **樹狀目錄與快速存取**：可輕鬆瀏覽電腦的本地磁碟機及快速存取資料夾（桌面、下載、圖片等）。
 - **USB 隨插即用支援**：插入或移除 USB 隨身碟時，能自動偵測並重新整理樹狀目錄。
-- **多國語言支援**：透過外部 `.ini` 語言檔提供英文、繁體中文等多語言切換。
+- **多國語言支援**：透過外部 `.ini` 語言檔提供英文、中文等多語言切換。
 - **格式過濾器**：可自訂在資料夾中要顯示的圖片格式。
 - **狀態記憶**：自動記憶應用程式的視窗大小、位置以及面板佈局配置，方便下次使用。
 

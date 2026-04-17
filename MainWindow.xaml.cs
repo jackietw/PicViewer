@@ -21,6 +21,7 @@ namespace PicViewer
         private Point _panStartPoint;
         private Point _scrollStartOffset;
         private System.Windows.Threading.DispatcherTimer _minimapHideTimer;
+        private System.Threading.CancellationTokenSource? _thumbnailLoadingCts;
         private bool _isFullScreen = false;
         
         // Save constraints before switching to full screen
@@ -282,13 +283,26 @@ namespace PicViewer
         private string? _currentFolderPath;
 
         // Read all images in the folder into the thumbnail list
-        private void LoadImagesFromFolder(string folderPath)
+        private async void LoadImagesFromFolder(string folderPath)
         {
             _currentFolderPath = folderPath;
             ImageItems.Clear();
+
+            // Cancel any previously running thumbnail loading task
+            if (_thumbnailLoadingCts != null)
+            {
+                _thumbnailLoadingCts.Cancel();
+                _thumbnailLoadingCts.Dispose();
+            }
+            _thumbnailLoadingCts = new System.Threading.CancellationTokenSource();
+            var cancellationToken = _thumbnailLoadingCts.Token;
+
             try
             {
                 var files = Directory.GetFiles(folderPath);
+                
+                // First pass: Add all valid files to the UI list immediately without thumbnails.
+                // This makes UI update instantly for hundreds of files.
                 foreach (string file in files)
                 {
                     string ext = Path.GetExtension(file).ToLower();
@@ -302,15 +316,53 @@ namespace PicViewer
                     else if ((ext == ".tif" || ext == ".tiff") && AppSettings.ShowTiff) allow = true;
                     else if (ext == ".ico" && AppSettings.ShowIco) allow = true;
                     else if (ext == ".svg" && AppSettings.ShowSvg) allow = true;
+                    else if (ext == ".heic" && AppSettings.ShowHeic) allow = true;
 
                     if (allow)
                     {
+                        ImageItems.Add(new ImageItem 
+                        { 
+                            ImagePath = file, 
+                            FileName = Path.GetFileName(file),
+                            Thumbnail = null // Processed asynchronously later
+                        });
+                    }
+                }
+
+                // Automatically select the first image if available
+                if (ImageItems.Count > 0)
+                {
+                    ThumbnailListView.SelectedIndex = 0;
+                }
+                else
+                {
+                    // Clear the main view if the folder is empty
+                    MainImageView.Source = null;
+                    MinimapImage.Source = null;
+                    if (TxtFileInfo != null) TxtFileInfo.Text = "";
+                    if (ExifInfoBorder != null) ExifInfoBorder.Visibility = Visibility.Collapsed;
+                    return; // No need to start background task if empty
+                }
+
+                // Prepare a copy of the list to process in the background thread safely
+                ImageItem[] itemsToProcess = new ImageItem[ImageItems.Count];
+                ImageItems.CopyTo(itemsToProcess, 0);
+
+                // Background pass: Generate thumbnails asynchronously
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    foreach (var imageItem in itemsToProcess)
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+
                         System.Windows.Media.ImageSource? thumb = null;
+                        string ext = Path.GetExtension(imageItem.ImagePath).ToLower();
+                        
                         try 
                         {
                             if (ext == ".svg")
                             {
-                                var svgDoc = Svg.SvgDocument.Open(file);
+                                var svgDoc = Svg.SvgDocument.Open(imageItem.ImagePath);
                                 svgDoc.Width = 150; // Force small width/height to quickly generate thumbnails
                                 svgDoc.Height = 150; 
                                 using (var bitmap = svgDoc.Draw())
@@ -319,12 +371,13 @@ namespace PicViewer
                                     {
                                         bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                                         ms.Position = 0;
+                                        
                                         var bi = new BitmapImage();
                                         bi.BeginInit();
                                         bi.CacheOption = BitmapCacheOption.OnLoad;
                                         bi.StreamSource = ms;
                                         bi.EndInit();
-                                        bi.Freeze(); // Freeze the object to improve performance and allow cross-thread access
+                                        bi.Freeze(); // Freeze the object to allow cross-thread access
                                         thumb = bi;
                                     }
                                 }
@@ -334,7 +387,7 @@ namespace PicViewer
                                 BitmapImage bi = new BitmapImage();
                                 bi.BeginInit();
                                 bi.DecodePixelWidth = 150; // Limit decoding size to speed up and save memory
-                                bi.UriSource = new Uri(file);
+                                bi.UriSource = new Uri(imageItem.ImagePath);
                                 bi.CacheOption = BitmapCacheOption.OnLoad;
                                 bi.EndInit();
                                 bi.Freeze();
@@ -343,30 +396,19 @@ namespace PicViewer
                         } 
                         catch { } // Ignore the thumbnail if specific image is corrupted, but keep the file item
 
-                        ImageItems.Add(new ImageItem 
-                        { 
-                            ImagePath = file, 
-                            FileName = Path.GetFileName(file),
-                            Thumbnail = thumb
-                        });
+                        if (thumb != null && !cancellationToken.IsCancellationRequested)
+                        {
+                            // Back to UI thread to update the Thumbnail property seamlessly
+                            Application.Current.Dispatcher.InvokeAsync(() => 
+                            {
+                                imageItem.Thumbnail = thumb;
+                            }, System.Windows.Threading.DispatcherPriority.Background);
+                        }
                     }
-                }
+                }, cancellationToken);
             }
             catch (UnauthorizedAccessException) { }
             catch (Exception) { }
-
-            // Automatically select the first image if available
-            if (ImageItems.Count > 0)
-            {
-                ThumbnailListView.SelectedIndex = 0;
-            }
-            else
-            {
-                // Clear the main view if the folder is empty
-                MainImageView.Source = null;
-                MinimapImage.Source = null;
-                if (TxtFileInfo != null) TxtFileInfo.Text = "";
-            }
         }
 
         // When a thumbnail is selected from the bottom list, display it in the central large image area
@@ -435,6 +477,116 @@ namespace PicViewer
                     MainImageView.Source = fullImage;
                     MinimapImage.Source = fullImage; // Synchronously update the minimap thumbnail
                     if (TxtFileInfo != null) TxtFileInfo.Text = fileInfoText;
+
+                    // Identify and show EXIF info
+                    string exifData = string.Empty;
+                    bool hasExif = false;
+                    
+                    if (ext != ".svg" && ext != ".gif" && ext != ".ico")
+                    {
+                        try
+                        {
+                            // Open stream without locking the file
+                            using (var stream = new FileStream(selectedImage.ImagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            {
+                                BitmapFrame frame = BitmapFrame.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                                BitmapMetadata? metadata = frame.Metadata as BitmapMetadata;
+                                
+                                if (metadata != null)
+                                {
+                                    System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+                                    // Size and Resolution
+                                    try 
+                                    {
+                                        double mBytes = new FileInfo(selectedImage.ImagePath).Length / 1048576.0;
+                                        int width = frame.PixelWidth;
+                                        int height = frame.PixelHeight;
+                                        double mp = (width * height) / 1000000.0;
+                                        sb.AppendLine($"📏 {mp:F1} MP • {width} x {height} • {mBytes:F1} MB");
+                                    } 
+                                    catch { }
+
+                                    // Device
+                                    string maker = metadata.CameraManufacturer ?? GetExifString(metadata, "/app1/ifd/{uint=271}") ?? "";
+                                    string model = metadata.CameraModel ?? GetExifString(metadata, "/app1/ifd/{uint=272}") ?? "";
+                                    if (!string.IsNullOrWhiteSpace(maker) || !string.IsNullOrWhiteSpace(model))
+                                    {
+                                        string device = $"{maker} {model}".Trim().Replace("Apple Apple", "Apple");
+                                        sb.AppendLine($"📱 {device}");
+                                    }
+                                    
+                                    // Lens
+                                    string lens = GetExifString(metadata, "/app1/ifd/exif:{uint=42036}") ?? "";
+                                    if (!string.IsNullOrWhiteSpace(lens)) sb.AppendLine($"🔭 {lens}");
+
+                                    // Settings (ISO, Focal Length, F-Stop, Exposure)
+                                    System.Collections.Generic.List<string> settings = new System.Collections.Generic.List<string>();
+                                    
+                                    try {
+                                        object? isoObj = metadata.GetQuery("/app1/ifd/exif:{uint=34855}");
+                                        if (isoObj != null) 
+                                        {
+                                            if (isoObj is ushort sequence) settings.Add($"ISO{sequence}");
+                                            else if (isoObj is ushort[] arr && arr.Length > 0) settings.Add($"ISO{arr[0]}");
+                                            else settings.Add($"ISO{isoObj}");
+                                        }
+                                    } catch { }
+
+                                    try {
+                                        double focal = ParseExifRational(metadata.GetQuery("/app1/ifd/exif:{uint=37386}"));
+                                        if (focal > 0) settings.Add($"{focal:F0}mm");
+                                    } catch { }
+
+                                    try {
+                                        double ev = ParseExifRational(metadata.GetQuery("/app1/ifd/exif:{uint=37380}"));
+                                        if (ev != 0) settings.Add($"{ev:+0.#;-0.#;0}ev");
+                                    } catch { }
+
+                                    try {
+                                        double fStop = ParseExifRational(metadata.GetQuery("/app1/ifd/exif:{uint=33437}"));
+                                        if (fStop > 0) settings.Add($"f/{fStop:F1}");
+                                    } catch { }
+
+                                    try {
+                                        double shutter = ParseExifRational(metadata.GetQuery("/app1/ifd/exif:{uint=33434}"));
+                                        if (shutter > 0) 
+                                        {
+                                            if (shutter < 1) settings.Add($"1/{Math.Round(1.0 / shutter)}s");
+                                            else settings.Add($"{shutter:F1}s");
+                                        }
+                                    } catch { }
+
+                                    if (settings.Count > 0) sb.AppendLine($"⚙️ {string.Join(" • ", settings)}");
+
+                                    // Date
+                                    string dateTaken = metadata.DateTaken ?? GetExifString(metadata, "/app1/ifd/exif:{uint=36867}") ?? GetExifString(metadata, "/app1/ifd/exif:{uint=36868}");
+                                    if (!string.IsNullOrWhiteSpace(dateTaken)) sb.AppendLine($"🗓 {dateTaken}");
+
+                                    if (sb.Length > 0)
+                                    {
+                                        exifData = sb.ToString().Trim();
+                                        hasExif = true;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (ExifInfoBorder != null)
+                    {
+                        if (hasExif)
+                        {
+                            ExifInfoBorder.ToolTip = exifData;
+                            ExifInfoBorder.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            ExifInfoBorder.ToolTip = null;
+                            ExifInfoBorder.Visibility = Visibility.Collapsed;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -442,6 +594,45 @@ namespace PicViewer
                         (string)Application.Current.Resources["Msg_Error"], MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        // Helper string extractor for EXIF
+        private string? GetExifString(BitmapMetadata metadata, string query)
+        {
+            try
+            {
+                object? val = metadata.GetQuery(query);
+                if (val is string str) return str.Trim('\0', ' ');
+                return val?.ToString();
+            }
+            catch { return null; }
+        }
+
+        // Helper fraction parser for EXIF rational types
+        private double ParseExifRational(object? obj)
+        {
+            if (obj == null) return 0;
+            if (obj is ulong u)
+            {
+                uint num = (uint)(u & 0xFFFFFFFF);
+                uint den = (uint)(u >> 32);
+                if (den != 0) return (double)num / den;
+            }
+            else if (obj is uint[] arr && arr.Length == 2 && arr[1] != 0)
+            {
+                return (double)arr[0] / arr[1];
+            }
+            else if (obj is long l)
+            {
+                int num = (int)(l & 0xFFFFFFFF);
+                int den = (int)(l >> 32);
+                if (den != 0) return (double)num / den;
+            }
+            else if (obj is int[] iarr && iarr.Length == 2 && iarr[1] != 0)
+            {
+                return (double)iarr[0] / iarr[1];
+            }
+            return 0;
         }
 
         // Listen to mouse wheel events: Ctrl+wheel to zoom, normal wheel to switch previous/next image
@@ -530,12 +721,12 @@ namespace PicViewer
             e.Handled = true;
         }
 
-        // Middle mouse button pressed, start panning
+        // Right mouse button pressed, start panning
         private void MainImageScrollViewer_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (_isFullScreen) return; // Disable panning in full screen
 
-            if (e.MiddleButton == System.Windows.Input.MouseButtonState.Pressed)
+            if (e.RightButton == System.Windows.Input.MouseButtonState.Pressed)
             {
                 _panStartPoint = e.GetPosition(this); // Get absolute coordinates relative to the window
                 _scrollStartOffset = new Point(MainImageScrollViewer.HorizontalOffset, MainImageScrollViewer.VerticalOffset);
@@ -551,7 +742,7 @@ namespace PicViewer
         // Mouse move, perform image panning
         private void MainImageScrollViewer_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
-            if (MainImageScrollViewer.IsMouseCaptured && e.MiddleButton == System.Windows.Input.MouseButtonState.Pressed)
+            if (MainImageScrollViewer.IsMouseCaptured && e.RightButton == System.Windows.Input.MouseButtonState.Pressed)
             {
                 Point currentPoint = e.GetPosition(this);
                 // Calculate panning distance
@@ -564,10 +755,10 @@ namespace PicViewer
             }
         }
 
-        // Middle mouse button released, end panning and restart countdown to hide minimap
+        // Right mouse button released, end panning and restart countdown to hide minimap
         private void MainImageScrollViewer_PreviewMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (MainImageScrollViewer.IsMouseCaptured && e.MiddleButton == System.Windows.Input.MouseButtonState.Released)
+            if (MainImageScrollViewer.IsMouseCaptured && e.RightButton == System.Windows.Input.MouseButtonState.Released)
             {
                 MainImageScrollViewer.ReleaseMouseCapture();
                 
@@ -605,6 +796,22 @@ namespace PicViewer
             // Calculate the position offset of the current visual range on the Minimap
             Canvas.SetLeft(MinimapViewportRect, offsetX * scaleMapX);
             Canvas.SetTop(MinimapViewportRect, offsetY * scaleMapY);
+
+            // Auto show or hide minimap based on zoom level
+            bool isZoomedIn = MainImageScale.ScaleX > 1.01 || MainImageScale.ScaleY > 1.01;
+            if (isZoomedIn)
+            {
+                // Always ensure it's visible when interacting
+                System.Windows.Media.Animation.DoubleAnimation fadeIn = new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(150));
+                MinimapBorder.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+                // If not currently holding middle mouse button, start the auto-hide timer
+                if (!MainImageScrollViewer.IsMouseCaptured)
+                {
+                    _minimapHideTimer.Stop();
+                    _minimapHideTimer.Start();
+                }
+            }
         }
 
         // Detect left-click double-click to enter and exit full screen
@@ -811,10 +1018,25 @@ namespace PicViewer
     }
 
     // Simple data structure that binds image path and file name together
-    public class ImageItem
+    public class ImageItem : System.ComponentModel.INotifyPropertyChanged
     {
         public string ImagePath { get; set; } = string.Empty;
         public string FileName { get; set; } = string.Empty;
-        public System.Windows.Media.ImageSource? Thumbnail { get; set; }
+        
+        private System.Windows.Media.ImageSource? _thumbnail;
+        public System.Windows.Media.ImageSource? Thumbnail 
+        { 
+            get => _thumbnail;
+            set
+            {
+                if (_thumbnail != value)
+                {
+                    _thumbnail = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Thumbnail)));
+                }
+            }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }
 }

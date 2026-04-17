@@ -130,14 +130,19 @@
                     </ScrollViewer>
                 </Border>
                 
-                <!-- Minimap floating in the top right corner -->
-                <Border x:Name="MinimapBorder" Width="200" Height="150" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="15" Background="#AA000000" CornerRadius="5" BorderBrush="#555" BorderThickness="1" Opacity="0" IsHitTestVisible="False">
+                <!-- Minimap floating in the top left corner -->
+                <Border x:Name="MinimapBorder" Width="200" Height="150" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15" Background="#AA000000" CornerRadius="5" BorderBrush="#555" BorderThickness="1" Opacity="0" IsHitTestVisible="False">
                     <Grid Margin="5" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Image x:Name="MinimapImage" Stretch="Uniform" />
                         <Canvas x:Name="MinimapCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                             <Border x:Name="MinimapViewportRect" BorderBrush="#00AAFF" BorderThickness="2" Background="#3300AAFF" />
                         </Canvas>
                     </Grid>
+                </Border>
+                
+                <!-- Info icon floating in the top right corner -->
+                <Border x:Name="ExifInfoBorder" Width="30" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="15" Background="#AA000000" CornerRadius="15" BorderBrush="#555" BorderThickness="1" ToolTip="EXIF Info" Visibility="Collapsed">
+                    <TextBlock Text="ⓘ" Foreground="White" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe UI, Segoe UI Emoji" Margin="0,-2,0,0"/>
                 </Border>
             </Grid>
 

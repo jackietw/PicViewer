@@ -18,6 +18,7 @@ namespace PicViewer
         public static bool ShowTiff = true;
         public static bool ShowIco = true;
         public static bool ShowSvg = true; // Enabled by default
+        public static bool ShowHeic = true;
         
         public static string LanguageFile = "en_US.ini";
 
@@ -55,6 +56,7 @@ namespace PicViewer
                         else if (key == "ShowTiff") ShowTiff = bool.Parse(value);
                         else if (key == "ShowIco") ShowIco = bool.Parse(value);
                         else if (key == "ShowSvg") ShowSvg = bool.Parse(value);
+                        else if (key == "ShowHeic") ShowHeic = bool.Parse(value);
                         else if (key == "LanguageFile") LanguageFile = value;
                         else if (key == "WindowLeft") WindowLeft = double.Parse(value);
                         else if (key == "WindowTop") WindowTop = double.Parse(value);
@@ -82,6 +84,7 @@ namespace PicViewer
                     sw.WriteLine($"ShowTiff={ShowTiff}");
                     sw.WriteLine($"ShowIco={ShowIco}");
                     sw.WriteLine($"ShowSvg={ShowSvg}");
+                    sw.WriteLine($"ShowHeic={ShowHeic}");
                     
                     sw.WriteLine($"WindowLeft={WindowLeft}");
                     sw.WriteLine($"WindowTop={WindowTop}");

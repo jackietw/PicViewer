@@ -24,6 +24,7 @@ namespace PicViewer
             ChkTiff.IsChecked = AppSettings.ShowTiff;
             ChkIco.IsChecked = AppSettings.ShowIco;
             ChkSvg.IsChecked = AppSettings.ShowSvg;
+            ChkHeic.IsChecked = AppSettings.ShowHeic;
         }
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
@@ -36,6 +37,7 @@ namespace PicViewer
             AppSettings.ShowTiff = ChkTiff.IsChecked ?? false;
             AppSettings.ShowIco = ChkIco.IsChecked ?? false;
             AppSettings.ShowSvg = ChkSvg.IsChecked ?? false;
+            AppSettings.ShowHeic = ChkHeic.IsChecked ?? false;
 
             AppSettings.Save();
 
@@ -66,7 +68,7 @@ namespace PicViewer
                 }
 
                 // Register extensions
-                string[] exts = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".ico", ".svg" };
+                string[] exts = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".ico", ".svg", ".heic" };
                 foreach (var ext in exts)
                 {
                     using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey($@"Software\Classes\{ext}"))
@@ -99,7 +101,7 @@ namespace PicViewer
             try
             {
                 string progId = "PicViewer.Image";
-                string[] exts = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".ico", ".svg" };
+                string[] exts = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".ico", ".svg", ".heic" };
 
                 // Remove extensions
                 foreach (var ext in exts)

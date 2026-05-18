@@ -317,6 +317,7 @@ namespace PicViewer
                     else if (ext == ".ico" && AppSettings.ShowIco) allow = true;
                     else if (ext == ".svg" && AppSettings.ShowSvg) allow = true;
                     else if (ext == ".heic" && AppSettings.ShowHeic) allow = true;
+                    else if (ext == ".webp" && AppSettings.ShowWebp) allow = true;
 
                     if (allow)
                     {

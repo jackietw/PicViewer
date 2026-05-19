@@ -20,8 +20,11 @@ namespace PicViewer
         public static bool ShowSvg = true; // Enabled by default
         public static bool ShowHeic = true;
         public static bool ShowWebp = true;
+        public static bool ShowExif = true;
         
         public static string LanguageFile = "en_US.ini";
+        
+        public static bool IsFirstRun = false;
 
         // Window state settings
         public static double WindowLeft = double.NaN;
@@ -34,7 +37,11 @@ namespace PicViewer
 
         public static void Load()
         {
-            if (!File.Exists(SettingsFilePath)) return;
+            if (!File.Exists(SettingsFilePath))
+            {
+                IsFirstRun = true;
+                return;
+            }
 
             try
             {
@@ -59,6 +66,7 @@ namespace PicViewer
                         else if (key == "ShowSvg") ShowSvg = bool.Parse(value);
                         else if (key == "ShowHeic") ShowHeic = bool.Parse(value);
                         else if (key == "ShowWebp") ShowWebp = bool.Parse(value);
+                        else if (key == "ShowExif") ShowExif = bool.Parse(value);
                         else if (key == "LanguageFile") LanguageFile = value;
                         else if (key == "WindowLeft") WindowLeft = double.Parse(value);
                         else if (key == "WindowTop") WindowTop = double.Parse(value);
@@ -88,6 +96,7 @@ namespace PicViewer
                     sw.WriteLine($"ShowSvg={ShowSvg}");
                     sw.WriteLine($"ShowHeic={ShowHeic}");
                     sw.WriteLine($"ShowWebp={ShowWebp}");
+                    sw.WriteLine($"ShowExif={ShowExif}");
                     
                     sw.WriteLine($"WindowLeft={WindowLeft}");
                     sw.WriteLine($"WindowTop={WindowTop}");

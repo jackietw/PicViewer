@@ -79,6 +79,16 @@ namespace PicViewer
             LoadLanguages();
             LoadDrives(); // Scan system drives after window load
 
+            if (AppSettings.IsFirstRun && !_openedFromExplorer)
+            {
+                AppSettings.IsFirstRun = false;
+                // Defer the execution to ensure UI is fully loaded before showing a modal dialog
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    MenuFormatFilter_Click(this, new RoutedEventArgs());
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+
             if (_openedFromExplorer && !string.IsNullOrEmpty(_startupImagePath))
             {
                 string dir = Path.GetDirectoryName(_startupImagePath) ?? string.Empty;
@@ -577,7 +587,7 @@ namespace PicViewer
 
                     if (ExifInfoBorder != null)
                     {
-                        if (hasExif)
+                        if (hasExif && AppSettings.ShowExif)
                         {
                             ExifInfoBorder.ToolTip = exifData;
                             ExifInfoBorder.Visibility = Visibility.Visible;
@@ -899,9 +909,9 @@ namespace PicViewer
         // Menu Event: File Format Filter Settings
         private void MenuFormatFilter_Click(object sender, RoutedEventArgs e)
         {
-            FilterWindow filterWindow = new FilterWindow();
-            filterWindow.Owner = this;
-            if (filterWindow.ShowDialog() == true)
+            SettingsWindow settingsWindow = new SettingsWindow();
+            settingsWindow.Owner = this;
+            if (settingsWindow.ShowDialog() == true)
             {
                 // After user clicks apply, reload current folder
                 TreeViewItem? selectedItem = FolderTreeView.SelectedItem as TreeViewItem;
@@ -1015,6 +1025,41 @@ namespace PicViewer
             MinimapImage.Source = null;
             if (TxtFileInfo != null) TxtFileInfo.Text = "";
             _currentFolderPath = null;
+        }
+
+        public void OpenFileFromOtherInstance(string filePath)
+        {
+            if (this.WindowState == WindowState.Minimized)
+            {
+                this.WindowState = AppSettings.WindowState != WindowState.Minimized ? AppSettings.WindowState : WindowState.Normal;
+            }
+            
+            this.Activate();
+            this.Topmost = true;  
+            this.Topmost = false; 
+            this.Focus();
+
+            if (File.Exists(filePath))
+            {
+                // Optionally enter full screen if it was opened directly via file association
+                if (!_isFullScreen)
+                {
+                    ToggleFullScreen();
+                }
+
+                string dir = Path.GetDirectoryName(filePath) ?? string.Empty;
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    LoadImagesFromFolder(dir);
+
+                    var targetItem = ImageItems.FirstOrDefault(i => i.ImagePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
+                    if (targetItem != null)
+                    {
+                        ThumbnailListView.SelectedItem = targetItem;
+                        ThumbnailListView.ScrollIntoView(targetItem);
+                    }
+                }
+            }
         }
     }
 

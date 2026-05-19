@@ -7,12 +7,38 @@ using System.Windows;
 
 namespace PicViewer
 {
-    public partial class FilterWindow : Window
+    public partial class SettingsWindow : Window
     {
-        public FilterWindow()
+        public SettingsWindow()
         {
             InitializeComponent();
             LoadCurrentSettings();
+            CheckAssociationStatus();
+        }
+
+        private void CheckAssociationStatus()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Classes\PicViewer.Image"))
+                {
+                    if (key != null)
+                    {
+                        TxtAssociationStatus.Text = (string)Application.Current.Resources["Msg_Associated"] ?? "Status: Associated";
+                        TxtAssociationStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 200, 100)); // Greenish
+                        BtnAssociate.IsEnabled = false;
+                        BtnRemoveAssociate.IsEnabled = true;
+                    }
+                    else
+                    {
+                        TxtAssociationStatus.Text = (string)Application.Current.Resources["Msg_NotAssociated"] ?? "Status: Not Associated";
+                        TxtAssociationStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(200, 100, 100)); // Reddish
+                        BtnAssociate.IsEnabled = true;
+                        BtnRemoveAssociate.IsEnabled = false;
+                    }
+                }
+            }
+            catch { }
         }
 
         private void LoadCurrentSettings()
@@ -26,6 +52,7 @@ namespace PicViewer
             ChkSvg.IsChecked = AppSettings.ShowSvg;
             ChkHeic.IsChecked = AppSettings.ShowHeic;
             ChkWebp.IsChecked = AppSettings.ShowWebp;
+            ChkShowExif.IsChecked = AppSettings.ShowExif;
         }
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
@@ -40,6 +67,7 @@ namespace PicViewer
             AppSettings.ShowSvg = ChkSvg.IsChecked ?? false;
             AppSettings.ShowHeic = ChkHeic.IsChecked ?? false;
             AppSettings.ShowWebp = ChkWebp.IsChecked ?? false;
+            AppSettings.ShowExif = ChkShowExif.IsChecked ?? true;
 
             AppSettings.Save();
 
@@ -91,6 +119,8 @@ namespace PicViewer
                 string successMsg = (string)Application.Current.Resources["Msg_AssocSuccess"] ?? "File associations set successfully!";
                 successMsg += "\n\n[Windows 10/11 Note]: Microsoft protects default apps.\nPlease right-click any image file -> 'Open with' -> 'Choose another app', select PicViewer, and check 'Always use this app'.";
                 MessageBox.Show(successMsg, "File Association", MessageBoxButton.OK, MessageBoxImage.Information);
+                
+                CheckAssociationStatus();
             }
             catch (System.Exception ex)
             {
@@ -129,6 +159,8 @@ namespace PicViewer
 
                 MessageBox.Show((string)Application.Current.Resources["Msg_RemoveAssocSuccess"] ?? "File associations removed successfully!", 
                                 "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                                
+                CheckAssociationStatus();
             }
             catch (System.Exception ex)
             {
